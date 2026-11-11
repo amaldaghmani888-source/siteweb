@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="{{ 'ar' if rtl else 'fr' }}" dir="{{ 'rtl' if rtl else 'ltr' }}">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ t.app }}</title><link rel="stylesheet" href="{{ url_for('static',filename='style.css') }}"></head>
+<body>
+<header class="topbar"><a class="brand" href="{{ url_for('index') }}"><span class="logo">♡</span><span><b>{{ t.app }}</b><small>{{ t.subtitle }}</small></span></a>
+<div class="top-actions"><span>{{ t.language }}</span><a class="lang {% if lang=='fr' %}chosen{% endif %}" href="{{ url_for('language',lang='fr') }}">FR</a><a class="lang {% if lang=='ar' %}chosen{% endif %}" href="{{ url_for('language',lang='ar') }}">العربية</a></div></header>
+{% if mode=='landing' %}
+<main class="landing"><div class="landing-intro"><span class="eyebrow">ESPACE NUMÉRIQUE DE SANTÉ</span><h1>{{ t.welcome }}</h1><p>{{ t.intro }}</p></div>
+<div class="role-grid">
+<a class="role-card woman-card" href="{{ url_for('space',role='woman') }}"><div class="role-symbol">♀</div><span class="tag">{{ t.personal }}</span><h2>{{ t.woman }}</h2><p>{{ t.woman_desc }}</p><span class="role-cta">{{ t.enter }} ←</span></a>
+<a class="role-card staff-card" href="{{ url_for('space',role='staff') }}"><div class="role-symbol">✚</div><span class="tag">{{ t.staffview }}</span><h2>{{ t.staff }}</h2><p>{{ t.staff_desc }}</p><span class="role-cta">{{ t.enter }} ←</span></a>
+</div><p class="landing-foot">{{ t.privacy }}</p></main>
+{% else %}
+<div class="layout">
+<aside class="sidebar"><a class="back" href="{{ url_for('index') }}">← {{ t.back }}</a>
+<div class="side-label">{{ t.module }}</div>
+{% if mode=='woman' %}
+{% for key,s in sections.items() %}<a class="nav-link {% if active==key %}active{% endif %}" href="{{ url_for('space',role='woman',section=key) }}"><span>{{ s.ar if rtl else s.title }}</span><small>{{ counts[key] }}</small></a>{% endfor %}
+{% else %}
+<a class="nav-link active" href="{{ url_for('space',role='staff') }}">▦ {{ t.activity }}</a>
+{% for key,s in sections.items() %}<a class="nav-link" href="{{ url_for('space',role='staff',section=key) }}">{{ s.ar if rtl else s.title }} <small>{{ counts[key] }}</small></a>{% endfor %}
+{% endif %}
+<div class="privacy">{{ t.privacy }}</div></aside>
+<main class="content">
+{% if mode=='staff' and not request.args.get('section') %}
+<div class="hero staff-hero"><span class="eyebrow">{{ t.staffview }}</span><h1>{{ t.activity }}</h1><p>{{ t.indicator_note }}</p></div>
+<div class="stats-grid">
+<div class="stat"><span>{{ t.records }}</span><strong>{{ stats.total }}</strong><small>{{ t.activity }}</small></div>
+<div class="stat"><span>{{ t.vaccines }}</span><strong>{{ stats.vaccination }}</strong><small>{{ t.records }}</small></div>
+<div class="stat"><span>{{ t.preg }}</span><strong>{{ stats.grossesse }}</strong><small>{{ t.records }}</small></div>
+<div class="stat"><span>{{ t.screen }}</span><strong>{{ stats.cancers }}</strong><small>{{ t.records }}</small></div>
+<div class="stat"><span>{{ t.consult }}</span><strong>{{ stats.consultations }}</strong><small>{{ t.records }}</small></div>
+</div>
+<div class="panel"><h2>{{ t.module }}</h2><div class="module-grid">{% for key,s in sections.items() %}<a href="{{ url_for('space',role='staff',section=key) }}"><span>{{ s.ar if rtl else s.title }}</span><b>{{ counts[key] }}</b></a>{% endfor %}</div></div>
+<p class="disclaimer">{{ t.countnote }}</p>
+{% else %}
+<div class="hero"><span class="eyebrow">{{ t.woman if mode=='woman' else t.staff }}</span><h1>{{ sections[active].ar if rtl else sections[active].title }}</h1><p>{{ t.intro }}</p></div>
+{% if active=='identite' and mode=='woman' %}
+<section class="panel"><h2>{{ t.profile }}</h2><form method="post" action="{{ url_for('save_profile') }}" class="form-grid">
+<label>Nom / الاسم<input name="nom" value="{{ profile.nom or '' }}"></label><label>Prénom / النسب<input name="prenom" value="{{ profile.prenom or '' }}"></label><label>Date d’ouverture / تاريخ الفتح<input type="date" name="date_ouverture" value="{{ profile.date_ouverture or '' }}"></label><label>Téléphone / الهاتف<input name="telephone" value="{{ profile.telephone or '' }}"></label><label class="wide">Adresse / العنوان<textarea name="adresse">{{ profile.adresse or '' }}</textarea></label><div class="wide actions"><button class="primary">{{ t.save_profile }}</button></div></form></section>
+{% else %}
+<section class="panel"><h2>{{ t.new }}</h2><form method="post" action="{{ url_for('add_record',section=active) }}" class="form-grid"><input type="hidden" name="role" value="{{ mode }}">
+{% for key,label,arabic,kind in sections[active].fields %}
+<label class="{% if kind=='textarea' %}wide{% endif %}">{{ arabic if rtl else label }}
+{% if kind=='textarea' %}<textarea name="{{ key }}" rows="3"></textarea>{% elif kind.startswith('select:') %}<select name="{{ key }}"><option value="">—</option>{% for opt in kind[7:].split(',') %}<option>{{ opt }}</option>{% endfor %}</select>{% else %}<input name="{{ key }}" type="{{ kind }}" {% if kind=='number' %}step="any"{% endif %}>{% endif %}</label>
+{% endfor %}<div class="wide actions"><button class="primary">{{ t.add }}</button></div></form></section>
+{% endif %}
+<section class="panel history"><div class="history-head"><h2>{{ t.history }}</h2><span class="pill">{{ counts[active] }} · {{ t.records }}</span></div>
+{% set ns=namespace(found=false) %}{% for record in records %}{% if record.section==active %}{% set ns.found=true %}<article class="record"><div class="record-date">{{ t.date }} · {{ record.created_at }}</div><div class="record-grid">{% for key,value in record.payload|fromjson|dictsort %}{% if value %}<div><b>{{ key.replace('_',' ')|title }}</b><p>{{ value }}</p></div>{% endif %}{% endfor %}</div>{% if mode=='woman' %}<form method="post" action="{{ url_for('delete_record',record_id=record.id) }}" onsubmit="return confirm('Supprimer ?')"><button class="delete">{{ t.delete }}</button></form>{% endif %}</article>{% endif %}{% endfor %}
+{% if not ns.found %}<div class="empty">{{ t.no_data }}</div>{% endif %}</section>
+{% endif %}
+<footer>{{ t.privacy }} · Ce carnet ne remplace pas le dossier médical officiel ni l’avis d’un professionnel de santé.</footer>
+</main></div>{% endif %}
+</body></html>
